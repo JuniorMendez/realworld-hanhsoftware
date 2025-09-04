@@ -9,7 +9,7 @@ export default async function globalSetup(_config: FullConfig) {
   const context = await browser.newContext();
   const page = await context.newPage();
 
-  // usuario único para esta corrida
+  // unique user
   const id = Date.now();
   const user = {
     username: `qa_user_${id}`,
@@ -17,14 +17,14 @@ export default async function globalSetup(_config: FullConfig) {
     password: 'HanhSoftwarePreInterview',
   };
 
-  // 1) intenta registrarlo
+  // register
   await page.goto(`${BASE_URL}/register`);
   await page.getByPlaceholder('Username').fill(user.username);
   await page.getByPlaceholder('Email').fill(user.email);
   await page.getByPlaceholder('Password').fill(user.password);
   await page.getByRole('button', { name: /^sign up$/i }).click();
 
-  // 2) si no aparece el username, intenta login (por si el usuario ya existía)
+  // If the username does not appear, try to login (in case the user already existed
   try {
     await page.getByRole('link', { name: user.username }).waitFor({ timeout: 5000 });
   } catch {
@@ -35,7 +35,7 @@ export default async function globalSetup(_config: FullConfig) {
     await page.getByRole('link', { name: user.username }).waitFor({ timeout: 5000 });
   }
 
-  // 3) guarda la sesión y las credenciales para el resto de los tests
+  // Save the session to the storage
   mkdirSync('storage', { recursive: true });
   await context.storageState({ path: 'storage/auth.json' });
   writeFileSync('storage/user.json', JSON.stringify(user), 'utf-8');
