@@ -1,261 +1,188 @@
-QA Automation – RealWorld (Conduit) with Playwright
-What is this?
+# QA Automation – RealWorld (Conduit) with Playwright
 
-This repository contains end-to-end tests (Playwright + TypeScript) against the RealWorld “Conduit” app:
+End-to-end tests (Playwright + TypeScript) for the **RealWorld “Conduit”** app.
 
-Backend: gothinkster/node-express-realworld-example-app
+* **Backend:** `gothinkster/node-express-realworld-example-app`
+* **Frontend:** `gothinkster/react-redux-realworld-example-app`
 
-Frontend: gothinkster/react-redux-realworld-example-app
+> Why this project?
+> It’s a realistic full-stack demo (auth, CRUD, feeds, comments) that’s widely used in the community, ideal for repeatable E2E testing and demonstrating POM, test data handling and positive/negative scenarios.
 
-Why this project?
+---
 
-It’s a full-stack demo (auth, CRUD, feeds, comments) close to a real product.
+## Table of Contents
 
-Stable and widely used in the community → good for repeatable testing.
+* [What’s included](#whats-included)
+* [Prerequisites](#prerequisites)
+* [Local setup](#local-setup)
+* [Run the tests](#run-the-tests)
+* [Critical flows covered](#critical-flows-covered)
+* [Project structure](#project-structure)
+* [Assumptions & modifications](#assumptions--modifications)
+* [Troubleshooting](#troubleshooting)
+* [License](#license)
 
-Clear user flows let us implement positive & negative scenarios and show test design, POM, and data handling.
+---
 
-What the tests cover
+## What’s included
 
-Implemented with a Page Object Model (POM) and run against a locally hosted frontend/backend:
+* **Playwright + TypeScript** test suite
+* **Page Object Model (POM)**
+* **Global setup** that creates a fresh user via API and stores an **authenticated** storage state (so tests don’t depend on execution order)
+* HTML reports and artifacts via Playwright
 
-Auth
+---
 
-Sign-Up (positive)
+## Prerequisites
 
-Sign-In (positive) using the user created in setup
+* **Node.js 18+ (LTS)**
+* **PostgreSQL 14+** running locally (for the RealWorld backend)
+* RealWorld **backend** and **frontend** running locally:
 
-Sign-In (negative) with wrong password
+  * Backend at `http://localhost:3333/api`
+  * Frontend at `http://localhost:4100`
 
-Articles
+> The test suite points to the **frontend** via Playwright `baseURL` and the app calls the backend.
 
-Create article (positive) and validate it appears in Global Feed
+---
 
-Create article (negative) with missing required fields → expect API 422 and no article in feed
+## Local setup
 
-The suite uses a global setup to create a fresh user via API and stores an authenticated storage state so test flows don’t depend on execution order.
+Clone this repo and install dependencies:
 
-Prerequisites
-
-Node.js: 18.x LTS recommended
-
-PostgreSQL: 14+ running locally
-
-Git and a modern shell
-
-If you’re on macOS and see fsevents/chokidar watcher errors in the frontend, prefer Node 18 and the default dev server.
-
-1) Backend – Node/Express + Prisma
-
-Clone the backend (or use your fork):
-
-git clone https://github.com/gothinkster/node-express-realworld-example-app.git
-cd node-express-realworld-example-app
-
-
-Create .env in the backend root:
-
-# .env
-DATABASE_URL="postgresql://<PG_USER>:<PG_PASSWORD>@localhost:5432/realworld?schema=public"
-JWT_SECRET="supersecreto_local"
-PORT=3333
-
-
-Install & prepare DB:
-
-npm ci
-npx prisma generate --schema src/prisma/schema.prisma
-npx prisma migrate dev --schema src/prisma/schema.prisma --name init
-
-
-Run the API:
-
-npm start
-
-
-Quick health check:
-
-curl -i http://localhost:3333/api/tags
-# expected: 200 OK with {"tags":[]}
-
-2) Frontend – React/Redux RealWorld
-
-Clone the frontend (or your fork) in a separate folder:
-
-git clone https://github.com/gothinkster/react-redux-realworld-example-app.git
-cd react-redux-realworld-example-app
-
-
-Point the UI to your local API by creating .env.development.local:
-
-# .env.development.local
-REACT_APP_API_ROOT=http://localhost:3333/api
-
-
-Install & run:
-
-npm ci
-npm start
-# dev server usually on http://localhost:4100
-
-
-Open http://localhost:4100 to verify the app loads.
-
-3) Tests – Playwright
-
-The following assumes tests live in this repository (with its own package.json).
-
-Install:
-
+```bash
 npm ci
 npx playwright install
+```
 
-Project structure (excerpt)
-tests/
-  pages/
-    navbar.page.ts
-    home.page.ts
-    editor.page.ts
-    article.page.ts
-  support/
-    fixtures.ts            # registers POMs as fixtures, sets baseURL
-    data-factory.ts        # random data builders
-  storage/
-    auth.json              # Playwright storage state (created by setup)
-    user.json              # generated user (created by setup)
-  global-setup.ts          # creates user via API and saves storage state
-playwright.config.ts       # baseURL, project, reporter, globalSetup
+> If you’re on macOS and hit `fsevents` issues, ensure Node 18 LTS and reinstall deps.
 
-How the setup works
+### Environment (app under test)
 
-global-setup.ts calls the backend API to register a new user, signs in, and writes:
+Make sure your RealWorld app is up:
 
-storage/auth.json → Playwright storageState (JWT cookie/localStorage)
+**Backend (example)**
 
-storage/user.json → user credentials (used in assertions)
+```bash
+# In the backend repo (node-express-realworld-example-app)
+export DATABASE_URL="postgresql://<user>:<pass>@localhost:5432/realworld?schema=public"
+export JWT_SECRET="supersecreto_local"
+export PORT=3333
+npm start
+```
 
-playwright.config.ts includes:
+**Frontend (example)**
 
-globalSetup: './tests/global-setup.ts'
+```bash
+# In the frontend repo (react-redux-realworld-example-app)
+# Ensure the frontend points to http://localhost:3333/api
+npm start
+# App should be at http://localhost:4100
+```
 
-use: { baseURL: 'http://localhost:4100', storageState: 'tests/storage/auth.json' }
+> The test project’s `playwright.config.ts` uses `baseURL` (default: `http://localhost:4100`).
+> If you change ports/URLs, update the config or export `FRONT_URL`.
 
-Running the tests
+---
 
-Make sure backend (3333) and frontend (4100) are up.
+## Run the tests
 
-Headless full run:
+Headless run:
 
+```bash
 npx playwright test
+```
 
+UI mode:
 
-Interactive UI mode:
-
+```bash
 npx playwright test --ui
+```
 
+Open last HTML report:
 
-Headed single project:
-
-npx playwright test --project=chromium --headed
-
-
-Filter by title:
-
-npx playwright test -g "Articles (POM)"
-
-
-Open the HTML report:
-
+```bash
 npx playwright show-report
+```
 
-Key assumptions & small tweaks
+---
 
-Ports
+## Critical flows covered
 
-Backend: 3333
+| Area         | Scenario                                 | Type     | Assertions (high level)                                             |
+| ------------ | ---------------------------------------- | -------- | ------------------------------------------------------------------- |
+| **Auth**     | Sign-Up                                  | Positive | Navbar shows username, session stored                               |
+| **Auth**     | Sign-In with created user                | Positive | Navbar shows username                                               |
+| **Auth**     | Sign-In wrong password                   | Negative | Error state (no session)                                            |
+| **Articles** | Create article & validate in Global Feed | Positive | POST returns 200/201, article title shown in feed                   |
+| **Articles** | Create article with missing fields       | Negative | API returns **422**, editor stays on `/editor`, article not in feed |
 
-Frontend: 4100
-If you change either, update:
+> Tests rely on **global-setup** to create a fresh account and save `storage/auth.json`, enabling authenticated flows without repeating login UI.
 
-Frontend .env.development.local → REACT_APP_API_ROOT
+---
 
-Playwright baseURL in playwright.config.ts (for the UI)
+## Project structure
 
-Any API base URL used by global-setup.ts
+```
+realworld-hanhsoftware/
+├─ pages/                  # Page Objects (POM)
+│  ├─ AuthPage.ts
+│  ├─ EditorPage.ts
+│  ├─ HomePage.ts
+│  ├─ Navbar.ts
+│  └─ ArticlePage.ts
+├─ support/
+│  ├─ data-factory.ts      # test data generators (e.g., newArticle)
+│  └─ fixtures.ts          # custom fixtures (navbar, editor, etc.)
+├─ storage/
+│  ├─ .gitkeep             # auth.json & user.json are ignored
+│  └─ (auth.json, user.json at runtime)
+├─ tests/
+│  ├─ auth.pom.spec.ts     # sign-up/sign-in flows
+│  └─ article.pom.spec.ts  # create article (+ / -) and feed assertions
+├─ global-setup.ts         # creates user via API + saves storage state
+├─ playwright.config.ts    # baseURL, reporters, project settings
+├─ README.md
+└─ .gitignore
+```
 
-User session
+---
 
-Tests rely on the global setup to create a brand-new user per test run and save an authenticated storage state. This makes tests order-independent.
+## Assumptions & modifications
 
-Status codes
+* **Frontend API root** is set to `http://localhost:3333/api`.
+  If your frontend still points to the public API, update its env or `agent.js` accordingly.
+* **Global setup** creates a brand-new user and stores `storage/auth.json` + `storage/user.json`.
+  These files are **git-ignored** and regenerated on each run.
+* For article creation, the backend may return **200 or 201**; tests accept both.
 
-Article creation may return 201 (Created) or 200 depending on the backend version; assertions accept either 200/201.
+---
 
-No app code changes required
+## Troubleshooting
 
-Tests assume a stock clone of both RealWorld projects. Only environment variables and local DB migrations are required.
+**“baseURL is not set”**
+Your `playwright.config.ts` must define `use.baseURL` (or set `FRONT_URL` env). Example:
 
-If you previously edited the frontend API client, ensure it reads the base URL from REACT_APP_API_ROOT and uses the app’s stored JWT (default RealWorld does).
+```ts
+use: {
+  baseURL: process.env.FRONT_URL || 'http://localhost:4100',
+}
+```
 
-PostgreSQL & Prisma
+**Frontend shows errors like “missing authorization credentials”**
+Ensure the frontend is using your local backend (`http://localhost:3333/api`) and you’re running with a valid session (global-setup creates it).
 
-Prisma uses the connection string from backend .env. If you see env conflicts (e.g., another .env under src/prisma/), consolidate into the root .env.
+**TypeError: fsevents.watch is not a function**
+Use Node 18 LTS and reinstall deps (`rm -rf node_modules && npm ci`).
 
-Troubleshooting
+**422 on article publish**
+That’s expected for the negative case (missing required fields).
+For the positive case, ensure you’re filling **title**, **description**, and **body**.
 
-401 Unauthorized / articles feed errors
+---
 
-Confirm REACT_APP_API_ROOT=http://localhost:3333/api and restart the frontend dev server.
+## License
 
-Make sure backend is running and reachable.
+MIT (or the license you prefer)
 
-Clear app storage (localStorage) and reload.
-
-fsevents.watch is not a function (macOS)
-
-Use Node 18 LTS for the frontend dev server.
-
-Prisma migrate errors
-
-Ensure Postgres is running and your DATABASE_URL is correct.
-
-If you recreated the database, re-run prisma generate and prisma migrate dev.
-
-Scripts (quick reference)
-
-Backend:
-
-# from node-express-realworld-example-app
-npm ci
-npx prisma generate --schema src/prisma/schema.prisma
-npx prisma migrate dev --schema src/prisma/schema.prisma --name init
-npm start
-
-
-Frontend:
-
-# from react-redux-realworld-example-app
-echo 'REACT_APP_API_ROOT=http://localhost:3333/api' > .env.development.local
-npm ci
-npm start
-
-
-Tests:
-
-# from this repo
-npm ci
-npx playwright install
-npx playwright test
-npx playwright show-report
-
-Tech highlights
-
-Playwright + TypeScript
-
-Page Object Model (POM): pages/*
-
-Global auth bootstrap with storage state (global-setup.ts)
-
-Randomized test data via small factory helpers
-
-Robust assertions: combine UI checks with API response validation
+---
